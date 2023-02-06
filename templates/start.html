@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Traveler</title>
+    <!-- bootstrap5风格   -->
+    <link rel="stylesheet" href="../static/bootstrap.css">
+    <script src="../static/popper.js"></script>
+    <script src="../static/bootstrap.js"></script>
+  </head>
+
+  <body>
+    <div class="container">
+      <div style="
+              position: fixed;
+			  padding: 28px;
+              top: 35%;
+			  left: 42%;
+            ">
+        <h2 class="text-danger">Traveler</h2>
+      </div>
+      <div class="row" style="
+              position: fixed;
+			  width: 700px;
+			  padding: 30px;
+              border-radius: 8px;
+              border-width: 2px;
+              top: 45%;
+			  left: 50%;
+			  margin-left:-350px ;
+			  background-color: #0066CC;
+            ">
+        <form action="/search" method="get" class="align-self-center mx-auto">
+          <div class="d-flex">
+            <div class="col-auto me-2">
+                <input name="query" class="form-control col-auto" type="search" list="history_list"
+                       placeholder="搜索网页" style="width:500px;"/>
+              <!-- 显示（所有用户）查询历史 -->
+              <datalist id="history_list">
+                {% for item in query_history %}
+                <option value="{{item}}">
+                {% endfor %}
+              </datalist>
+            </div>
+            <div class="col-auto me-2">
+                <input  class="form-control col-auto" type="submit" value="搜索"/>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

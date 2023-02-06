@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+    <meta charset="UTF-8">
+    <!-- bootstrap5风格   -->
+    <link rel="stylesheet" href="../static/bootstrap.css">
+    <script src="../static/popper.js"></script>
+    <script src="../static/bootstrap.js"></script>
+    <script type=text/javascript>
+        <!-- 这里收集用户点击链接的行为作为隐式反馈 -->
+        function link_clicked(url, user_id) {
+            const request = new XMLHttpRequest();
+            request.open("GET", "/link_clicked?url=" + url + "&user_id=" + user_id, true)
+            request.send()
+        }
+    </script>
+    <title>Traveler</title>
+    <style>
+        a:visited {
+	        color: purple; /*已访问的链接颜色*/
+        }
+        em {
+            color: red; /*预览界面匹配词项的颜色*/
+        }
+        button {
+            white-space: nowrap /*按钮内部不换行*/
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 页眉 -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid" style="margin-left: 3%;margin-right: 10%;">
+            <a class="navbar-brand" tabindex="-1" href="/">Traveler</a>
+            <div class="container p-2">
+                <form class="d-flex" action='/search' method='get' id="search">
+                    <!-- https://docs.djangoproject.com/zh-hans/4.1/ref/templates/builtins/ -->
+                    <!-- https://handlebarsjs.com/ -->
+                    <input name="query" class="form-control me-2 " type="search" list="history_list" value="{{query_string}}">
+                    <!-- 显示（所有用户）查询历史 -->
+                    <datalist id="history_list">
+                        {% for item in query_history %}
+                        <option value="{{item}}"></option>
+                        {% endfor %}
+                    </datalist>
+                    <button class="btn btn-outline-primary" type="submit">搜索</button>
+                </form>
+            </div>
+            <button type="button" class="btn btn-default navbar-btn" data-bs-toggle="modal" data-bs-target="#advancedModal">
+                高级搜索
+            </button>
+            {% if user['id'] == 'default' %}
+                <button type="button" class="btn btn-default navbar-btn" data-bs-toggle="modal" data-bs-target="#loginModal">
+                    登录/注册
+                </button>
+            {% else %}
+                <div class="navbar-item" style="white-space: nowrap">{{user['id']}}</div>
+                <button type="button" class="btn btn-default navbar-btn" data-bs-toggle="modal" data-bs-target="#infoModal">
+                    修改信息
+                </button>
+                <form action="/logout" method="get" id="logout">
+                    <button class="btn btn-outline-primary" type="submit">退出登录</button>
+                </form>
+            {% endif %}
+        </div>
+    </nav>
+    <!-- 高级搜索模态框 -->
+    <div class="modal" id="advancedModal">
+        <div class="modal-dialog">
+            <div class="modal-content" style="position: relative; width: 125%;">
+                <div class="modal-header">
+                    <h4 class="modal-title">高级搜索</h4>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form method='get' action='/search' id="advanced">
+                        <input name="query" type="hidden" value="{{query_string}}" />
+                        <input name="edit_advanced_options" type="hidden" value="1">
+                        <!-- 站内搜索 -->
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">站内搜索</span>
+                            <input name="site_url" class="form-control" list="site_list"
+                                placeholder="限定要搜索的网站是..." value="{{advanced['site_url']}}"/>
+                            <datalist id="site_list">
+                                <option value="https://travel.qunar.com/"></option>
+                                <option value="https://bbs.qyer.com/"></option>
+                                <option value="https://www.baidu.com/"></option>
+                            </datalist>
+                        </div>
+                        <!-- 搜索字段  -->
+                        <div class="row align-items-start">
+                            <label class="form-label col-auto">搜索字段</label>
+                            {% for field, name in [('url', 'url'), ('title', '标题'), ('author', '作者'),
+                                                   ('how', '玩法'), ('anchors', '锚文本'), ('text', '正文')] %}
+                                {% if field in advanced['fields'] %}
+                                    <div class="form-check col-auto">
+                                        <label class="form-check-label">
+                                            <input name="fields" class="form-check-input" type="checkbox" value="{{field}}" checked /> {{name}}
+                                        </label>
+                                    </div>
+                                {% else %}
+                                    <div class="form-check col-auto">
+                                        <label class="form-check-label">
+                                            <input name="fields" class="form-check-input" type="checkbox" value="{{field}}" /> {{name}}
+                                        </label>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <!-- 默认/短语/通配查询 -->
+                        <div class="row align-items-start">
+                            <label class="form-label col-auto">查询方式</label>
+                            {% for query_type, name in [('default', '默认'), ('match_phrase', '短语查询'), ('wildcard', '通配查询')] %}
+                                {% if query_type == advanced['query_type'] %}
+                                    <div class="form-check col-auto">
+                                        <label class="form-check-label">
+                                            <input class="form-check-input" type="radio" name="method" value="{{query_type}}" checked /> {{name}}
+                                        </label>
+                                    </div>
+                                {% else %}
+                                    <div class="form-check col-auto">
+                                        <label class="form-check-label">
+                                            <input class="form-check-input" type="radio" name="method" value="{{query_type}}" /> {{name}}
+                                        </label>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-primary mb-3">确定</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 登录/注册模态框 -->
+    <div class="modal" id="loginModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">登录/注册</h4>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="/login" method="get" id="login">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">ID</span>
+                            <input name="user_id" type="text" class="form-control" list="user_id_list" />
+                            <datalist id="user_id_list">
+                                {% for user_id in users %}
+                                <option value="{{user_id}}"></option>
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                        <button type="submit" class="btn btn-primary mb-3">
+                            登录/注册
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 修改个人信息模态框 -->
+    <div class="modal" id="infoModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">修改信息</h4>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="/change_info" method="get" id="change_info">
+                        <label class="form-label col-auto">个人信息</label>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">目的地</span>
+                            <input name="destinations" type="text" value="{{user['destinations']}}" class="form-control" />
+                        </div>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">预期开销（元）</span>
+                            <input name="min_cost" class="form-control" type="number" value={{user['min_cost']}} oninput="value=value.replace('-', '')" />
+                            <span class="input-group-text">~</span>
+                            <input name="max_cost" class="form-control" type="number" value={{user['max_cost']}} oninput="value=value.replace('-', '')" />
+                        </div>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">预期天数</span>
+                            <input name="min_days" class="form-control" type="number" value={{user['min_days']}}  oninput="value=value.replace('-', '')" />
+                            <span class="input-group-text">~</span>
+                            <input name="max_days" class="form-control" type="number" value={{user['max_days']}}  oninput="value=value.replace('-', '')" />
+                        </div>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">伙伴</span>
+                            <input name="who" class="form-control" type="text" value="{{user['who']}}" list="partner_list"/>
+                            <datalist id="partner_list">
+                                <option value="独自一人、独自旅行"></option>
+                                <option value="朋友、三五好友、闺蜜"></option>
+                                <option value="情侣"></option>
+                                <option value="亲子、家庭"></option>
+                            </datalist>
+                        </div>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">玩法</span>
+                            <input name="how" class="form-control" type="text" value="{{user['how']}}" list="method_list"/>
+                            <datalist id="method_list">
+                                <option value="深度游"></option>
+                                <option value="短途、短途周末"></option>
+                                <option value="小长假、长假"></option>
+                                <option value="徒步"></option>
+                                <option value="自驾"></option>
+                                <option value="租车"></option>
+                                <option value="游轮"></option>
+                                <option value="海滨、海岛、海边、看海、海"></option>
+                                <option value="日出、日落"></option>
+                                <option value="古镇"></option>
+                                <option value="草原"></option>
+                                <option value="美食"></option>
+                                <option value="摄影、拍照"></option>
+                                <option value="购物"></option>
+                                <option value="爬山、登山"></option>
+                                <option value="休闲"></option>
+                                <option value="文艺"></option>
+                                <option value="第一次"></option>
+                                <option value="夏季、暑假"></option>
+                                <option value="度假"></option>
+                                <option value="踏春、春季"></option>
+                                <option value="冬季、寒假"></option>
+                                <option value="秋季、赏秋"></option>
+                                <option value="国庆、五一、中秋节"></option>
+                            </datalist>
+                        </div>
+                        <button type="submit" class="btn btn-primary mb-3">
+                            确定
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row p-5" style="margin-left: 5%; margin-right: 10%">
+        <div class="col-md-8" >
+            <!--  列出本页10条搜索结果  -->
+            <div class="container m-3">
+                <ul class="list-group">
+                    {% for link in links %}
+                    <li class="list-group-item list-group-item-light ">
+                        <!-- 标题 -->
+                        <div style="font-size: 20px;">
+                            {% autoescape off %}
+                              <a target="_blank" href="{{link['url']}}" id="link"
+                                 onclick="link_clicked('{{link['url']}}', '{{user['id']}}')">
+                                  <!-- https://stackoverflow.com/posts/72673364/revisions -->
+                                  {{''.join(link['title'])}}
+                              </a>
+                            {% endautoescape %}
+                        </div>
+                        <!-- url -->
+                        <div style="display: inline; font-size: 12px; color: green;">
+                            <span>
+                               {{link['url']}}
+                            </span>
+                        </div>
+                        <!-- 网页快照 -->
+                        {% if link['snapshot'] == True %}
+                        <div>
+                            <a target="_blank" style="font-size:12px;"
+                               href="{{'\snapshot?url='+link['url']+'&query='+query_string}}">
+                                网页快照
+                            </a>
+                        </div>
+                        {% endif %}
+                        <!-- 其它信息 -->
+                        <div style="font-size: 12px; color: orange;">
+                            <span>
+                                {% if link['days'] != '' %}
+                                    {{link['days']}} 天 |
+                                {% endif %}
+                                {% if link['cost'] != '' %}
+                                    {{link['cost']}} 元 |
+                                {% endif %}
+                                {% if link['how'] != '' %}
+                                    {{link['how']}} |
+                                {% endif %}
+                            </span>
+                        </div>
+                        <!-- 出发日期、正文预览、作者 -->
+                        <div style="font-size: 15px;">{{link['date']}} ——
+                            <span>
+                                {% autoescape off %}{{''.join(link['text'])+'...'}}{% endautoescape %}
+                            </span>
+                        </div>
+                        <div style="font-size: 12px;">
+                            <span>
+                                {% if link['author'] != '' %}
+                                    by {{link['author']}}
+                                {% endif %}
+                            </span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <!--  跳转到其它页      -->
+            <div class="container m-5">
+                <div class="row" style="position: relative; width: 40%;">
+                    <form class="d-flex" action='/search' method='get' id="jump">
+                        <div class="input-group mb-3">
+                            <input name="query" type="hidden" value="{{query_string}}">
+                            <span class="input-group-text">第</span>
+                            <input name="page_no" class="form-control col-auto" type="number" value="{{page_no}}"  oninput="value=value.replace('-', '')"/>
+                            <span class="input-group-text">页</span>
+                            <button class="btn btn-outline-primary" type="submit">跳转</button>
+                        </div>
+                    </form>
+                </div>
+             </div>
+        </div>
+        <div class="col-md-4" >
+            <!-- 相关推荐 -->
+            <div class="container m-3">
+                <h3 class="text-danger">相关推荐：</h3>
+                <div class="container m-3">
+                    <ul class="list-group">
+                        {% for recommendation in recommendations %}
+                        <li class="list-group-item list-group-item-light ">
+                            <!-- 标题 -->
+                            <div style="font-size: 20px;">
+                                {% autoescape off %}
+                                <a target="_blank" href="{{recommendation['url']}}" id="rec_link"
+                                   onclick="link_clicked('{{recommendation['url']}}', '{{user['id']}}')">
+                                    <!-- https://stackoverflow.com/posts/72673364/revisions -->
+                                    {{''.join(recommendation['title'])}}
+                                </a>
+                                {% endautoescape %}
+                            </div>
+                            <!-- url -->
+                            <div style="display: inline; font-size: 12px; color: green;">
+                                <span>
+                                    {{recommendation['url']}}
+                                </span>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
